@@ -1,0 +1,66 @@
+[
+  {
+    "pill_id": "P-LISIN10",
+    "drug": "Lisinopril",
+    "dose": "10 mg",
+    "route": "oral",
+    "candy_standin": "green candy",
+    "visual": {
+      "shape": "round",
+      "color": "green",
+      "approx_mm": 12
+    },
+    "color_family": "green",
+    "photo_refs": [],
+    "active": true,
+    "notes": "Maria regular med - GREEN PATH",
+    "families": [
+      "green"
+    ],
+    "vlm_aliases": [
+      "green"
+    ]
+  },
+  {
+    "pill_id": "P-WARF5",
+    "drug": "Warfarin",
+    "dose": "5 mg",
+    "route": "oral",
+    "candy_standin": "white pills in amber bottle",
+    "visual": {
+      "shape": "round",
+      "color": "white (amber through bottle)",
+      "approx_mm": 12
+    },
+    "color_family": "white",
+    "photo_refs": [],
+    "active": true,
+    "notes": "Martin only - THE BLOCK BEAT",
+    "families": [
+      "orange",
+      "white"
+    ],
+    "vlm_aliases": [
+      "orange",
+      "white",
+      "amber"
+    ]
+  },
+  {
+    "pill_id": "P-LISIN10-NEW",
+    "drug": "Lisinopril",
+    "dose": "10 mg",
+    "route": "oral",
+    "candy_standin": "jelly bean (blue picked, unbranded)",
+    "visual": {
+      "shape": "oblong",
+      "color": "blue",
+      "approx_mm": 15
+    },
+    "color_family": "blue",
+    "photo_refs": [],
+    "active": false,
+    "supersedes": "P-LISIN10",
+    "notes": "NEW SUPPLIER appearance - activated only via approved Hermes proposal"
+  }
+]

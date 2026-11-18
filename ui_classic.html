@@ -1,0 +1,502 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MEDPASS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #faf9f5; --ink: #1a1915; --muted: #6e6b64; --line: #e8e6e0;
+    --card: #ffffff; --accent: #d97757;
+    --green: #2e7d4f; --green-bg: #e9f4ee;
+    --red: #b3261e; --red-bg: #fdecea;
+    --amber: #b26a00; --amber-bg: #fdf3e3;
+    --grey: #5f6368; --grey-bg: #f0efec;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* ---- top bar ---- */
+  #top {
+    display: flex; align-items: center; gap: 18px;
+    padding: 10px 22px; border-bottom: 1px solid var(--line); background: var(--card);
+  }
+  #wordmark { font-family: ui-serif, Georgia, serif; font-size: 26px; font-weight: 700; letter-spacing: .5px; }
+  #wordmark .dot { color: var(--accent); }
+  #tagline { color: var(--muted); font-size: 13px; margin-right: auto; }
+  .stat { text-align: right; }
+  .stat b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+  .chip {
+    display: inline-block; padding: 3px 10px; border-radius: 99px;
+    font-size: 11.5px; font-weight: 700; letter-spacing: .6px;
+  }
+  .chip.ok { background: var(--green-bg); color: var(--green); }
+  .chip.bad { background: var(--red-bg); color: var(--red); }
+  .chip.warn { background: var(--amber-bg); color: var(--amber); }
+  .chip.grey { background: var(--grey-bg); color: var(--grey); }
+
+  /* ---- main grid ---- */
+  #main { flex: 1; display: grid; grid-template-columns: 320px 1fr 420px; gap: 14px; padding: 14px 22px; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .pane { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .pane h3 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--muted); margin-bottom: 10px; font-weight: 700;
+  }
+
+  /* patient pane */
+  #pt-name { font-size: 21px; font-weight: 750; }
+  #pt-meta { color: var(--muted); font-size: 13px; margin: 3px 0 10px; }
+  .order { display: flex; justify-content: space-between; padding: 7px 0; border-top: 1px dashed var(--line); font-size: 13.5px; }
+  .order b { font-weight: 650; }
+  .order span { color: var(--muted); }
+  #cabinet { display: flex; align-items: center; justify-content: space-between; }
+  #cabinet .big { font-size: 19px; font-weight: 800; letter-spacing: .5px; }
+  #cab-note { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+
+  /* verdict */
+  #verdict-pane { flex: 1.1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                  text-align: center; transition: background .25s, border-color .25s; min-height: 210px; position: relative; }
+  #verdict { font-size: 104px; font-weight: 850; letter-spacing: -1px; line-height: 1.0; }
+  #verdict-chip { margin-top: 6px; }
+  #summary { font-size: 18px; margin-top: 12px; max-width: 640px; color: inherit; }
+  #source-chip { position: absolute; top: 12px; right: 14px; }
+  #transcript {
+    margin-top: 14px; font-family: var(--mono); font-size: 14px;
+    padding: 8px 16px; border-radius: 10px; display: none;
+    background: rgba(0,0,0,.06);
+  }
+  #transcript::before { content: "🔊 "; }
+  .v-idle    { background: var(--card); }
+  .v-green   { background: var(--green-bg); border-color: var(--green) !important; color: var(--green); }
+  .v-red     { background: var(--red); border-color: var(--red) !important; color: #fff; }
+  .v-amber   { background: var(--amber-bg); border-color: var(--amber) !important; color: var(--amber); }
+  .v-grey    { background: var(--grey-bg); border-color: var(--grey) !important; color: var(--grey); }
+
+  /* camera */
+  #cam-pane { flex: 1; position: relative; overflow: hidden; padding: 0; background: #111; min-height: 220px; }
+  #cam-pane img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  #boxes { position: absolute; inset: 0; pointer-events: none; }
+  #cam-tag { position: absolute; left: 12px; top: 10px; }
+  #keys { position: absolute; right: 12px; bottom: 10px; font-family: var(--mono); font-size: 11px; color: #ddd;
+          background: rgba(0,0,0,.55); padding: 5px 10px; border-radius: 8px; }
+
+  /* memory panel */
+  #memory-pane { flex: 1; overflow-y: auto; }
+  #mem-state { float: right; cursor: pointer; }
+  #mem-verdict-line { font-size: 14.5px; font-weight: 650; margin-bottom: 8px; }
+  .evidence { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+  .evidence .head { display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; }
+  .evidence.hot { border-color: var(--amber); background: var(--amber-bg); }
+  .evidence .nums { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+  .nm { font-size: 12px; padding: 4px 0 0; color: var(--muted); }
+  .nm b { color: var(--ink); font-weight: 600; }
+  pre.pipeline {
+    font-family: var(--mono); font-size: 11px; line-height: 1.5; background: #f4f3ef;
+    border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px;
+    overflow-x: auto; white-space: pre; margin-top: 8px;
+  }
+  .xstats { display: flex; gap: 14px; font-size: 11.5px; color: var(--muted); margin-top: 6px; font-family: var(--mono); }
+  .xstats b { color: var(--ink); }
+
+  /* ask the memory */
+  #ask-row { display: flex; gap: 8px; }
+  #ask {
+    flex: 1; font: 14px system-ui; padding: 9px 12px; border: 1.5px solid var(--line);
+    border-radius: 10px; background: var(--bg); color: var(--ink); outline: none;
+  }
+  #ask:focus { border-color: var(--accent); }
+  #ask-go { background: var(--accent); border: 0; color: #fff; font-weight: 700; border-radius: 10px; padding: 0 16px; cursor: pointer; }
+  #ask-out { margin-top: 10px; font-size: 13px; }
+  #ask-answer { font-size: 14.5px; font-weight: 600; margin-bottom: 6px; }
+  .prov { font-size: 10px; font-weight: 800; letter-spacing: .5px; padding: 1px 6px; border-radius: 6px; vertical-align: 1px; }
+  .prov.seed { background: var(--grey-bg); color: var(--grey); }
+  .prov.live { background: var(--green-bg); color: var(--green); }
+
+  /* audit rail */
+  #audit { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line);
+           background: var(--card); padding: 8px 22px; font-family: var(--mono); font-size: 12px; height: 46px; }
+  #audit .title { font-family: system-ui; font-size: 10.5px; letter-spacing: 1.2px; color: var(--muted);
+                  text-transform: uppercase; font-weight: 700; }
+  #ledger-rows { display: flex; gap: 10px; overflow: hidden; flex: 1; white-space: nowrap; }
+  .lrow { padding: 3px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); }
+  .lrow .ok { color: var(--green); font-weight: 700; }
+  .lrow .no { color: var(--red); font-weight: 700; }
+  #approve-banner {
+    display: none; position: fixed; inset: auto 0 60px 0; margin: 0 auto; width: 560px;
+    background: var(--card); border: 2px solid var(--amber); border-radius: 16px; padding: 18px 22px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.18); z-index: 40;
+  }
+  #approve-banner h4 { font-size: 15px; margin-bottom: 8px; }
+  #approve-banner .row { display: flex; gap: 8px; }
+  #approver { flex: 1; font: 14px system-ui; padding: 8px 12px; border: 1.5px solid var(--line); border-radius: 10px; }
+  #approve-go { background: var(--green); color: #fff; border: 0; border-radius: 10px; font-weight: 700; padding: 0 18px; cursor: pointer; }
+  .flash { animation: flash .45s 3; }
+  @keyframes flash { 50% { box-shadow: inset 0 0 0 6px var(--red); } }
+</style>
+</head>
+<body>
+  <div id="top">
+    <div id="wordmark">MEDPASS<span class="dot">.</span></div>
+    <div id="tagline">always-on medication safety &middot; models perceive &middot; rules decide &middot; humans approve</div>
+    <div class="stat"><b id="m-admin">–</b><span>events in memory</span></div>
+    <div class="stat"><b id="m-nm">–</b><span>near-misses</span></div>
+    <div class="stat"><b id="m-ledger">–</b><span>ledger rows</span></div>
+    <div class="stat"><b id="m-egress">–</b><span>uplink tx, whole box</span></div>
+    <div class="stat"><span class="chip ok" id="m-chain">CHAIN OK</span><span>&nbsp;</span></div>
+    <div class="stat"><span class="chip ok">ALL INFERENCE LOCAL</span><span id="m-host">&nbsp;</span></div>
+  </div>
+
+  <div id="main">
+    <!-- left: patient -->
+    <div class="col">
+      <div class="pane" id="pt-pane">
+        <h3>Patient record <span style="float:right" class="prov seed">SYNTHETIC</span></h3>
+        <div id="pt-name">—</div>
+        <div id="pt-meta">scan a wristband to load the record</div>
+        <div id="pt-orders"></div>
+      </div>
+      <div class="pane">
+        <h3>Med cabinet</h3>
+        <div id="cabinet">
+          <span class="big" id="cab-status">LOCKED</span>
+          <span class="chip grey" id="cab-chip">IDLE</span>
+        </div>
+        <div id="cab-note">hold is autonomous &middot; unlock requires a named pharmacist (app-layer policy gate)</div>
+      </div>
+      <div class="pane" style="flex:1; overflow:auto">
+        <h3>Last spoken</h3>
+        <div id="spoken-log" style="font-size:13px; color:var(--muted)">—</div>
+      </div>
+    </div>
+
+    <!-- middle: verdict + camera -->
+    <div class="col">
+      <div class="pane v-idle" id="verdict-pane">
+        <span id="source-chip"></span>
+        <div id="verdict" style="color:var(--muted); font-size:64px">READY</div>
+        <div id="verdict-chip"></div>
+        <div id="summary" style="color:var(--muted)">place the cup and wristband on the mat, then press SPACE</div>
+        <div id="transcript"></div>
+      </div>
+      <div class="pane" id="cam-pane">
+        <img id="cam" alt="live camera">
+        <canvas id="boxes"></canvas>
+        <span class="chip ok" id="cam-tag">LIVE CAMERA</span>
+        <div id="keys">SPACE verify &middot; A approve &middot; M memory on/off &middot; ESC unfocus &middot; 1/2/3 replay</div>
+      </div>
+    </div>
+
+    <!-- right: memory -->
+    <div class="col">
+      <div class="pane" id="memory-pane">
+        <h3>MongoDB memory — retrieval that changes behavior
+          <span id="mem-state" class="chip ok" onclick="toggleMemory()">MEMORY ON</span></h3>
+        <div id="mem-verdict-line" style="color:var(--muted)">no retrieval yet</div>
+        <div id="mem-evidence"></div>
+        <pre class="pipeline" id="mem-pipeline" style="display:none"></pre>
+        <div class="xstats" id="mem-stats" style="display:none"></div>
+      </div>
+      <div class="pane">
+        <h3>Ask the memory <span style="float:right;color:var(--muted);font-size:10px">nemotron-3-nano writes the query</span></h3>
+        <div id="ask-row">
+          <input id="ask" placeholder="How many near-misses this month, by shift?">
+          <button id="ask-go" onclick="askMemory()">Ask</button>
+        </div>
+        <div id="ask-out"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="audit">
+    <span class="title">Audit ledger (hash-chained)</span>
+    <div id="ledger-rows"></div>
+  </div>
+
+  <div id="approve-banner">
+    <h4>⚠ Pharmacist review required — <span id="approve-ev"></span></h4>
+    <div class="row">
+      <input id="approver" placeholder="Approver name, e.g. D. Okafor, PharmD">
+      <button id="approve-go" onclick="sendApproval()">Approve &amp; unlock</button>
+    </div>
+  </div>
+
+  <audio id="player"></audio>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+let heldEvent = null;
+
+/* ---------- helpers ---------- */
+const fmtBytes = n => n > 1e6 ? (n/1e6).toFixed(1)+" MB" : n > 1e3 ? (n/1e3).toFixed(1)+" kB" : n+" B";
+const fmtN = n => (n ?? 0).toLocaleString();
+function esc(el, s) { el.textContent = s ?? ""; }   // untrusted strings via textContent only
+
+/* ---------- metrics rail ---------- */
+async function refreshMetrics() {
+  try {
+    const m = await (await fetch("/metrics")).json();
+    esc($("m-admin"), fmtN(m.doc_counts.administrations));
+    esc($("m-nm"), fmtN(m.doc_counts.near_misses));
+    esc($("m-ledger"), fmtN(m.doc_counts.ledger));
+    esc($("m-egress"), fmtBytes(m.uplink_tx_bytes_since_start));
+    esc($("m-host"), m.hostname);
+    const c = $("m-chain");
+    c.className = "chip " + (m.chain.ok ? "ok" : "bad");
+    esc(c, m.chain.ok ? "CHAIN OK · " + m.chain.rows : "CHAIN BROKEN @" + m.chain.broken_at_seq);
+    setCabinet(m.cabinet.status, m.cabinet.held_for);
+    setMemChip(m.memory_enabled);
+  } catch (e) {}
+}
+setInterval(refreshMetrics, 4000); refreshMetrics();
+
+function setCabinet(status, heldFor) {
+  esc($("cab-status"), status || "LOCKED");
+  const chip = $("cab-chip");
+  if (status === "UNLOCKED") { chip.className = "chip ok"; esc(chip, "APPROVED"); }
+  else if (heldFor) { chip.className = "chip bad"; esc(chip, "HELD · " + heldFor); }
+  else { chip.className = "chip grey"; esc(chip, "IDLE"); }
+}
+function setMemChip(on) {
+  const el = $("mem-state");
+  el.className = "chip " + (on ? "ok" : "grey");
+  esc(el, on ? "MEMORY ON" : "MEMORY OFF");
+}
+
+/* ---------- ledger rail ---------- */
+async function refreshLedger() {
+  const d = await (await fetch("/ledger/recent?n=10")).json();
+  const box = $("ledger-rows"); box.innerHTML = "";
+  d.rows.forEach(r => {   // newest first, so the row a beat just wrote is visible
+    const el = document.createElement("span");
+    el.className = "lrow";
+    const mark = document.createElement("span");
+    mark.className = r.allowed ? "ok" : "no";
+    mark.textContent = r.allowed ? "✓ " : "✗ ";
+    el.appendChild(mark);
+    el.appendChild(document.createTextNode(`#${r.seq} ${r.actor} ${r.action}`));
+    box.appendChild(el);
+  });
+}
+refreshLedger();
+
+/* ---------- verdict card ---------- */
+const VSTYLE = {
+  VERIFIED: ["v-green", "VERIFIED", "ok"],
+  BLOCKED: ["v-red", "BLOCKED", "bad"],
+  PHARMACIST_REVIEW: ["v-amber", "REVIEW", "warn"],
+  HOLD_UNREADABLE: ["v-grey", "HOLD", "grey"],
+};
+function showVerdict(rec) {
+  const [cls, label, chipCls] = VSTYLE[rec.verdict] || ["v-idle", rec.verdict, "grey"];
+  const pane = $("verdict-pane");
+  pane.className = "pane " + cls;
+  $("verdict").style.cssText = "";
+  esc($("verdict"), label);
+  const chip = $("verdict-chip");
+  chip.innerHTML = "";
+  const c = document.createElement("span");
+  c.className = "chip " + chipCls;
+  c.textContent = rec.verdict.replaceAll("_", " ");
+  chip.appendChild(c);
+  esc($("summary"), rec.summary);
+  $("summary").style.color = "inherit";
+
+  const src = $("source-chip");
+  src.className = "chip " + (rec.source === "replay" ? "warn" : "ok");
+  esc(src, rec.source === "replay" ? "REPLAY FIXTURE" : "LIVE");
+
+  const t = $("transcript");
+  if (rec.spoken) { t.style.display = "inline-block"; esc(t, rec.spoken);
+    const log = $("spoken-log"); log.textContent = "“" + rec.spoken + "”";
+    if (rec.audio) { $("player").src = rec.audio; $("player").play().catch(()=>{}); }
+  } else t.style.display = "none";
+
+  if (rec.verdict === "BLOCKED") { pane.classList.add("flash"); setTimeout(() => pane.classList.remove("flash"), 1600); }
+  if (rec.verdict === "BLOCKED" || rec.verdict === "PHARMACIST_REVIEW") {
+    heldEvent = rec.event_id;
+    esc($("approve-ev"), rec.event_id);
+    $("approve-banner").style.display = "block";
+  } else {
+    // a clean verdict clears any stale review banner from the previous beat
+    heldEvent = null;
+    $("approve-banner").style.display = "none";
+  }
+  showPatient(rec);
+  showMemory(rec.memory);
+  refreshLedger(); refreshMetrics();
+}
+
+async function showPatient(rec) {
+  const mrn = rec.patient && rec.patient.mrn;
+  if (!mrn) return;
+  try {
+    const d = await (await fetch(`/patients/${mrn}/orders`)).json();
+    esc($("pt-name"), d.patient.name);
+    esc($("pt-meta"), `${d.patient.mrn} · DOB ${d.patient.dob} · room ${d.patient.room} · ward ${d.patient.ward}`);
+    const box = $("pt-orders"); box.innerHTML = "";
+    d.orders.forEach(o => {
+      const row = document.createElement("div"); row.className = "order";
+      const b = document.createElement("b"); b.textContent = o.pill_id;
+      const s = document.createElement("span"); s.textContent = `due start+${o.demo_offset_min}m · ±${o.window_min}m`;
+      row.append(b, s); box.appendChild(row);
+    });
+  } catch (e) {}
+}
+
+/* ---------- memory panel ---------- */
+function showMemory(mem) {
+  const line = $("mem-verdict-line"), evBox = $("mem-evidence");
+  evBox.innerHTML = "";
+  $("mem-pipeline").style.display = "none"; $("mem-stats").style.display = "none";
+  if (!mem) { esc(line, "no retrieval on this verdict"); line.style.color = "var(--muted)"; return; }
+  if (!mem.memory_enabled) {
+    esc(line, "MEMORY OFF — retrieval skipped (counterfactual mode)"); line.style.color = "var(--grey)"; return;
+  }
+  if (mem.escalated) { esc(line, "⬆ " + mem.reason); line.style.color = "var(--amber)"; }
+  else if (mem.patterns && mem.patterns.length) { esc(line, "history consulted — no live risk pattern"); line.style.color = "var(--green)"; }
+  else { esc(line, "no retrieval on this verdict (rules already decided)"); line.style.color = "var(--muted)"; return; }
+
+  (mem.patterns || []).forEach(p => {
+    const d = document.createElement("div");
+    d.className = "evidence" + (p.hot ? " hot" : "");
+    const head = document.createElement("div"); head.className = "head";
+    const t1 = document.createElement("span"); t1.textContent = `${p.drug} · ward ${p.ward}`;
+    const t2 = document.createElement("span"); t2.textContent = p.hot ? `${p.count} ≥ ${p.threshold} HOT` : `${p.count} < ${p.threshold}`;
+    head.append(t1, t2);
+    const nums = document.createElement("div"); nums.className = "nums";
+    const shifts = Object.entries(p.by_shift || {}).map(([k, v]) => `${k} ${v}`).join(" · ");
+    nums.textContent = `last ${p.window_days} days · ${shifts || "no events"}`;
+    d.append(head, nums);
+    (p.recent || []).forEach(r => {
+      const n = document.createElement("div"); n.className = "nm";
+      const b = document.createElement("b"); b.textContent = r.nm_id + " ";
+      const tag = document.createElement("span");
+      tag.className = "prov " + (r.provenance === "observed_today" ? "live" : "seed");
+      tag.textContent = r.provenance === "observed_today" ? "OBSERVED TODAY" : "SEEDED";
+      n.append(b, document.createTextNode((r.note || "") + " "), tag);
+      d.appendChild(n);
+    });
+    evBox.appendChild(d);
+    if (p.pipeline) {
+      const pre = $("mem-pipeline");
+      pre.style.display = "block";
+      pre.textContent = JSON.stringify(p.pipeline, null, 1);
+      const xs = $("mem-stats"); xs.style.display = "flex"; xs.innerHTML = "";
+      [["index", p.explain && p.explain.index], ["docs examined", p.explain && p.explain.docs_examined],
+       ["query", p.query_ms + " ms"]].forEach(([k, v]) => {
+        const s = document.createElement("span");
+        const b = document.createElement("b"); b.textContent = (v ?? "–") + " ";
+        s.append(b, document.createTextNode(k)); xs.appendChild(s);
+      });
+    }
+  });
+}
+
+async function toggleMemory() {
+  const r = await (await fetch("/demo/memory_toggle", { method: "POST" })).json();
+  setMemChip(r.memory_enabled);
+}
+
+/* ---------- ask the memory ---------- */
+async function askMemory() {
+  const q = $("ask").value.trim() || $("ask").placeholder;
+  const out = $("ask-out");
+  out.innerHTML = ""; const w = document.createElement("div"); w.textContent = "thinking (local model writing the query)…";
+  w.style.color = "var(--muted)"; out.appendChild(w);
+  try {
+    const r = await (await fetch(`/memory/ask?q=${encodeURIComponent(q)}`)).json();
+    out.innerHTML = "";
+    const a = document.createElement("div"); a.id = "ask-answer";
+    const total = r.rows.reduce((s, x) => s + (x.n || x.count || 0), 0);
+    a.textContent = r.rows.length ? `${total || r.rows.length} result${r.rows.length > 1 ? "s" : ""} · ${r.model} · ${r.total_ms} ms` : "no rows";
+    out.appendChild(a);
+    r.rows.slice(0, 6).forEach(row => {
+      const d = document.createElement("div");
+      d.style.cssText = "font-family:var(--mono);font-size:12px;padding:2px 0";
+      d.textContent = JSON.stringify(row);
+      out.appendChild(d);
+    });
+    const pre = document.createElement("pre"); pre.className = "pipeline";
+    pre.textContent = JSON.stringify(r.pipeline, null, 1);
+    out.appendChild(pre);
+  } catch (e) { out.textContent = "query failed"; }
+}
+$("ask").addEventListener("keydown", e => { if (e.key === "Enter") { askMemory(); $("ask").blur(); } });
+
+/* ---------- approval ---------- */
+async function sendApproval() {
+  const name = $("approver").value.trim();
+  if (!name || !heldEvent) return;
+  await fetch("/approvals", { method: "POST", headers: { "content-type": "application/json" },
+                              body: JSON.stringify({ event_id: heldEvent, approver: name }) });
+  $("approve-banner").style.display = "none";
+  $("approver").value = "";
+  $("approver").blur(); heldEvent = null;
+  refreshLedger(); refreshMetrics();
+}
+
+/* ---------- camera boxes ---------- */
+function drawBoxes(boxes) {
+  const cv = $("boxes"), img = $("cam");
+  cv.width = cv.clientWidth; cv.height = cv.clientHeight;
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  // account for object-fit: contain letterboxing
+  const ar = 960 / 540, box = cv.width / cv.height;
+  let w = cv.width, h = cv.height, ox = 0, oy = 0;
+  if (box > ar) { w = h * ar; ox = (cv.width - w) / 2; } else { h = w / ar; oy = (cv.height - h) / 2; }
+  ctx.lineWidth = 2.5; ctx.font = "700 13px system-ui";
+  (boxes || []).forEach(b => {
+    const color = b.kind === "wristband" ? "#7ec8ff" : "#ffd166";
+    ctx.strokeStyle = color; ctx.fillStyle = color;
+    ctx.strokeRect(ox + b.x * w, oy + b.y * h, b.w * w, b.h * h);
+    ctx.fillText(b.label, ox + b.x * w + 3, oy + b.y * h - 5);
+  });
+}
+
+/* ---------- SSE ---------- */
+function connectSSE() {
+  const es = new EventSource("/events");
+  es.addEventListener("verification", e => showVerdict(JSON.parse(e.data).record));
+  es.addEventListener("boxes", e => drawBoxes(JSON.parse(e.data).boxes));
+  es.addEventListener("cabinet", e => { const d = JSON.parse(e.data); setCabinet(d.status, d.held_for); refreshLedger(); });
+  es.addEventListener("approval", () => { refreshLedger(); refreshMetrics(); });
+  es.addEventListener("denied", () => { refreshLedger(); });
+  es.addEventListener("memory_toggle", e => setMemChip(JSON.parse(e.data).enabled));
+  es.onerror = () => { es.close(); setTimeout(connectSSE, 1500); };
+}
+connectSSE();
+// MJPEG stream attached after load so it never blocks the page's load event.
+window.addEventListener("load", () => { $("cam").src = "/camera/stream"; });
+
+/* ---------- keys ---------- */
+let busy = false;
+async function fire(url) {
+  if (busy) return; busy = true;
+  $("verdict").style.color = "var(--muted)";
+  try { const r = await fetch(url, { method: "POST" }); if (!r.ok) console.warn(await r.text()); }
+  finally { busy = false; }
+}
+document.addEventListener("keydown", e => {
+  // ESC always returns focus to the stage so SPACE works again after typing
+  if (e.key === "Escape") { document.activeElement && document.activeElement.blur(); return; }
+  if (e.target.tagName === "INPUT") return;
+  if (e.code === "Space") { e.preventDefault(); fire("/demo/trigger"); }
+  else if (e.key === "1") fire("/demo/replay/green");
+  else if (e.key === "2") fire("/demo/replay/block");
+  else if (e.key === "3") fire("/demo/replay/memory");
+  else if (e.key.toLowerCase() === "m") toggleMemory();
+  else if (e.key.toLowerCase() === "a") { if (heldEvent) { $("approve-banner").style.display = "block"; $("approver").focus(); } }
+});
+</script>
+</body>
+</html>

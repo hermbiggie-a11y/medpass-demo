@@ -1,0 +1,984 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>MEDPASS</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --bg: #f1ebdf; --ink: #2a2721; --muted: #7c766a; --line: #ded5c2;
+    --card: #faf7f0; --accent: #c9673f; --accent-soft: #e9c9b8;
+    --green: #2e7d4f; --green-bg: #e6f2ea;
+    --red: #b3261e; --red-bg: #fbe9e7;
+    --amber: #a86412; --amber-bg: #f8edd8;
+    --grey: #6b6f76; --grey-bg: #edeae2;
+    --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg); color: var(--ink);
+    background-image: radial-gradient(#e7e0d1 1px, transparent 1px);
+    background-size: 26px 26px;
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+    display: flex; flex-direction: column; overflow: hidden;
+  }
+
+  /* ---- top bar ---- */
+  #top {
+    display: flex; align-items: center; gap: 18px;
+    padding: 10px 22px; border-bottom: 1px solid var(--line); background: var(--card);
+  }
+  #wordmark { font-family: ui-serif, Georgia, serif; font-size: 26px; font-weight: 700; letter-spacing: .5px; }
+  #wordmark .dot { color: var(--accent); }
+  #tagline { color: var(--muted); font-size: 13px; margin-right: auto; }
+  .stat { text-align: right; }
+  .stat b { display: block; font-size: 15px; font-variant-numeric: tabular-nums; }
+  .stat span { font-size: 10.5px; color: var(--muted); text-transform: uppercase; letter-spacing: .8px; }
+  .chip {
+    display: inline-block; padding: 3px 10px; border-radius: 99px;
+    font-size: 11.5px; font-weight: 700; letter-spacing: .6px;
+  }
+  .chip.ok { background: var(--green-bg); color: var(--green); }
+  .chip.bad { background: var(--red-bg); color: var(--red); }
+  .chip.warn { background: var(--amber-bg); color: var(--amber); }
+  .chip.grey { background: var(--grey-bg); color: var(--grey); }
+
+  /* ---- main grid ---- */
+  #main { flex: 1; display: grid; grid-template-columns: 395px 1fr 430px; gap: 14px; padding: 14px 22px; min-height: 0; }
+  .col { display: flex; flex-direction: column; gap: 14px; min-height: 0; }
+  .pane { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  .pane h3 {
+    font-size: 11px; text-transform: uppercase; letter-spacing: 1.2px;
+    color: var(--muted); margin-bottom: 10px; font-weight: 700;
+  }
+
+  /* patient pane */
+  #pt-name { font-size: 25px; font-weight: 750; }
+  #pt-meta { color: var(--muted); font-size: 13.5px; margin: 3px 0 10px; }
+  .order { display: flex; justify-content: space-between; padding: 8px 0; border-top: 1px dashed var(--line); font-size: 15px; }
+  .order b { font-weight: 650; }
+  .order span { color: var(--muted); }
+  #cabinet { display: flex; align-items: center; justify-content: space-between; }
+  #cabinet .big { font-size: 24px; font-weight: 800; letter-spacing: .5px; }
+  #cab-note { font-size: 11.5px; color: var(--muted); margin-top: 6px; }
+
+  /* verdict */
+  #verdict-pane { flex: 1.1; display: flex; flex-direction: column; align-items: center; justify-content: center;
+                  text-align: center; transition: background .25s, border-color .25s; min-height: 210px; position: relative; }
+  #verdict { font-size: 104px; font-weight: 850; letter-spacing: -1px; line-height: 1.0; }
+  #verdict-chip { margin-top: 6px; }
+  #summary { font-size: 18px; margin-top: 12px; max-width: 640px; color: inherit; }
+  #source-chip { position: absolute; top: 12px; right: 14px; }
+  #transcript {
+    margin-top: 14px; font-family: var(--mono); font-size: 14px;
+    padding: 8px 16px; border-radius: 10px; display: none;
+    background: rgba(0,0,0,.06);
+  }
+  #transcript::before { content: "🔊 "; }
+  .v-idle    { background: var(--card); }
+  .v-green   { background: var(--green-bg); border-color: var(--green) !important; color: var(--green); }
+  .v-red     { background: var(--red); border-color: var(--red) !important; color: #fff; }
+  .v-amber   { background: var(--amber-bg); border-color: var(--amber) !important; color: var(--amber); }
+  .v-grey    { background: var(--grey-bg); border-color: var(--grey) !important; color: var(--grey); }
+
+  /* camera */
+  #cam-pane { flex: 1; position: relative; overflow: hidden; padding: 0; background: #111; min-height: 220px; }
+  #cam-pane img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  #boxes { position: absolute; inset: 0; pointer-events: none; }
+  #cam-tag { position: absolute; left: 12px; top: 10px; }
+  #scanline { position: absolute; left: 0; right: 0; height: 3px; top: -4%; z-index: 3;
+              background: linear-gradient(90deg, transparent, #7ec8ff 25%, #d7ecff 50%, #7ec8ff 75%, transparent);
+              box-shadow: 0 0 14px #7ec8ffcc; opacity: 0; }
+  #cam-pane.scanning #scanline { opacity: 1; animation: sweep 1.15s cubic-bezier(.45,0,.55,1) 2; }
+  @keyframes sweep { from { top: -2%; } to { top: 101%; } }
+  #keys { position: absolute; right: 12px; bottom: 10px; font-family: var(--mono); font-size: 11px; color: #ddd;
+          background: rgba(0,0,0,.55); padding: 5px 10px; border-radius: 8px; }
+
+  /* ---- the MongoDB flow strip: data visibly flowing into the agent ---- */
+  #flow { position: relative; display: flex; align-items: center; justify-content: space-between;
+          margin: 4px auto 18px; padding: 22px 0 10px; min-height: 158px; width: 94%; }
+  .fstop { text-align: center; width: 118px; z-index: 2; }
+  .fstop .glyph { width: 84px; height: 84px; border-radius: 7px; margin: 0 auto 9px;
+                  background: var(--bg); border: 3px solid var(--ink);
+                  box-shadow: 5px 5px 0 var(--line);
+                  display: flex; align-items: center; justify-content: center;
+                  transition: border-color .25s, box-shadow .25s, transform .18s; }
+  .fstop .glyph canvas { width: 66px; height: 66px; image-rendering: pixelated; }
+  .fstop.hot .glyph { transform: translate(-1px,-1px); box-shadow: 4px 4px 0 var(--accent-soft); }
+  .fstop svg { display: none; }
+  .fstop .fl { font: 700 11.5px/1.2 var(--mono); letter-spacing: 1px; color: var(--muted); }
+  .fstop .fv { font: 700 13.5px/1.35 var(--mono); min-height: 18px; }
+  .fstop.hot .glyph { border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+  .fstop.hot svg { stroke: var(--accent); }
+  #fwire { position: absolute; left: 62px; right: 62px; top: 64px; height: 3px;
+           background: var(--line); z-index: 1; }
+  .fdot { position: absolute; top: -4px; width: 11px; height: 11px; border-radius: 0;
+          background: var(--accent); opacity: 0; left: 0;
+          box-shadow: inset -2px -2px 0 rgba(0,0,0,.18); }
+  .fdot.run { animation: fdrift var(--dur, 2.6s) steps(18, end) forwards; }
+  @keyframes fdrift { 0% { left: 0%; opacity: 0; } 12% { opacity: .75; }
+                      88% { opacity: .75; } 100% { left: calc(100% - 7px); opacity: 0; } }
+  .fdot.burst { background: var(--amber); width: 9px; height: 9px; top: -3.5px;
+                box-shadow: 0 0 8px var(--amber); }
+  #fwire.pulse { animation: wpulse .9s 2; }
+  @keyframes wpulse { 50% { background: var(--accent); box-shadow: 0 0 10px var(--accent-soft); } }
+  #retrieve-tick { font: 700 13px var(--mono); color: var(--amber); text-align: center;
+                   min-height: 19px; margin: -8px 0 10px; opacity: 0; transition: opacity .3s; }
+  #retrieve-tick.show { opacity: 1; }
+  .fdot.rev { animation-name: fdriftrev; }
+  @keyframes fdriftrev { 0% { left: calc(100% - 7px); opacity: 0; } 12% { opacity: .85; }
+                         88% { opacity: .85; } 100% { left: 0%; opacity: 0; } }
+  .fdot.carrier { width: 18px; height: 18px; top: -8px; background: var(--card);
+                  border: 3.5px solid var(--accent); border-radius: 0;
+                  box-shadow: 2px 2px 0 var(--accent-soft); }
+  .fdot.rev.carrier { animation-timing-function: steps(14, end); }
+  /* hover the OpenClaw stop -> what the agent has been doing */
+  .fstop { position: relative; }
+  #f-agent .ftip { display: none; position: absolute; top: 98px; right: -8px; width: 265px; z-index: 20;
+                   background: var(--ink); color: var(--bg); border-radius: 10px; padding: 9px 11px;
+                   text-align: left; font: 10.5px/1.55 var(--mono); box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+  #f-agent:hover .ftip { display: block; }
+  #f-agent .ftip .tt { color: var(--accent-soft); font-weight: 700; letter-spacing: .8px; }
+  #agent-note { display: none; margin: 0 0 14px; padding: 13px 15px; border-radius: 12px;
+                background: var(--bg); border: 1px solid var(--line);
+                border-left: 4px solid var(--accent); font-size: 15px; line-height: 1.55; }
+  #agent-note .who { font: 700 11px/1 var(--mono); letter-spacing: 1.1px; color: var(--accent);
+                     display: block; margin-bottom: 6px; }
+
+  /* memory panel */
+  #memory-pane { flex: 1; overflow-y: auto; }
+  #mem-state { float: right; cursor: pointer; }
+  #mem-verdict-line { font-size: 16px; font-weight: 650; margin-bottom: 9px; }
+  .evidence { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+  .evidence .head { display: flex; justify-content: space-between; font-weight: 700; font-size: 14px; }
+  .evidence.hot { border-color: var(--amber); background: var(--amber-bg); }
+  .evidence .nums { font-size: 12.5px; color: var(--muted); margin-top: 3px; }
+  .nm { font-size: 12px; padding: 4px 0 0; color: var(--muted); }
+  .nm b { color: var(--ink); font-weight: 600; }
+  pre.pipeline {
+    font-family: var(--mono); font-size: 11px; line-height: 1.5; background: #f4f3ef;
+    border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px;
+    overflow-x: auto; white-space: pre; margin-top: 8px;
+  }
+  .xstats { display: flex; gap: 14px; font-size: 11.5px; color: var(--muted); margin-top: 6px; font-family: var(--mono); }
+  .xstats b { color: var(--ink); }
+
+  /* ask the memory */
+  #ask-row { display: flex; gap: 8px; }
+  #ask {
+    flex: 1; font: 14px system-ui; padding: 9px 12px; border: 1.5px solid var(--line);
+    border-radius: 10px; background: var(--bg); color: var(--ink); outline: none;
+  }
+  #ask:focus { border-color: var(--accent); }
+  #ask-go { background: var(--accent); border: 0; color: #fff; font-weight: 700; border-radius: 10px; padding: 0 16px; cursor: pointer; }
+  #ask-out { margin-top: 10px; font-size: 13px; }
+  #ask-answer { font-size: 14.5px; font-weight: 600; margin-bottom: 6px; }
+  .prov { font-size: 10px; font-weight: 800; letter-spacing: .5px; padding: 1px 6px; border-radius: 6px; vertical-align: 1px; }
+  .prov.seed { background: var(--grey-bg); color: var(--grey); }
+  .prov.live { background: var(--green-bg); color: var(--green); }
+
+  /* audit rail */
+  #audit { display: flex; align-items: center; gap: 12px; border-top: 1px solid var(--line);
+           background: var(--card); padding: 8px 22px; font-family: var(--mono); font-size: 12px; height: 46px; }
+  #audit .title { font-family: system-ui; font-size: 10.5px; letter-spacing: 1.2px; color: var(--muted);
+                  text-transform: uppercase; font-weight: 700; }
+  #ledger-rows { display: flex; gap: 10px; overflow: hidden; flex: 1; white-space: nowrap; }
+  .lrow { padding: 3px 9px; border: 1px solid var(--line); border-radius: 7px; background: var(--bg); }
+  .lrow .ok { color: var(--green); font-weight: 700; }
+  .lrow .no { color: var(--red); font-weight: 700; }
+  #approve-banner {
+    display: none; position: fixed; inset: auto 0 60px 0; margin: 0 auto; width: 560px;
+    background: var(--card); border: 2px solid var(--amber); border-radius: 16px; padding: 18px 22px;
+    box-shadow: 0 12px 40px rgba(0,0,0,.18); z-index: 40;
+  }
+  #approve-banner h4 { font-size: 15px; margin-bottom: 8px; }
+  #approve-banner .row { display: flex; gap: 8px; }
+  #approver { flex: 1; font: 14px system-ui; padding: 8px 12px; border: 1.5px solid var(--line); border-radius: 10px; }
+  #approve-go { background: var(--green); color: #fff; border: 0; border-radius: 10px; font-weight: 700; padding: 0 18px; cursor: pointer; }
+  #decline-go { background: var(--card); color: var(--red); border: 1.5px solid var(--red); border-radius: 10px; font-weight: 700; padding: 0 14px; cursor: pointer; }
+  #decline-go:hover { background: var(--red-bg); }
+  .flash { animation: flash .45s 3; }
+  @keyframes flash { 50% { box-shadow: inset 0 0 0 6px var(--red); } }
+  /* ---- patient memory explorer ---- */
+  #all-patients-btn { cursor: pointer; }
+  #pmodal { display: none; position: fixed; inset: 0; z-index: 70;
+            background: rgba(42,39,33,.35); backdrop-filter: blur(2px); }
+  #pmodal.open { display: flex; align-items: center; justify-content: center; }
+  #pcard { width: 680px; max-height: 78vh; background: var(--card); border: 1px solid var(--line);
+           border-radius: 18px; box-shadow: 0 24px 70px rgba(42,39,33,.35);
+           display: flex; flex-direction: column; overflow: hidden; }
+  #pm-head { padding: 18px 24px 12px; border-bottom: 1px solid var(--line); position: relative; }
+  #pm-head h2 { font-family: ui-serif, Georgia, serif; font-size: 24px; }
+  #pm-sub { font: 12px var(--mono); color: var(--muted); }
+  #pm-back { font: 700 12.5px var(--mono); color: var(--accent); cursor: pointer; display: block; margin-bottom: 2px; }
+  #pm-close { position: absolute; top: 16px; right: 16px; width: 30px; height: 30px; border-radius: 50%;
+              border: 1px solid var(--line); background: var(--bg); cursor: pointer; color: var(--muted); }
+  #pm-body { padding: 14px 24px 22px; overflow-y: auto; }
+  .prow { display: flex; align-items: center; gap: 12px; padding: 12px 14px; margin: 7px 0;
+          border: 1px solid var(--line); border-radius: 12px; cursor: pointer; background: var(--bg);
+          transition: border-color .15s, transform .12s; }
+  .prow:hover { border-color: var(--accent); transform: translateX(3px); }
+  .prow .pname { font-weight: 750; font-size: 16px; flex: 1; }
+  .prow .pmeta { font: 12px var(--mono); color: var(--muted); }
+  /* patient knowledge graph */
+  #kg { width: 100%; display: block; }
+  #kg .kedge { fill: none; stroke: var(--line); stroke-width: 1.6; }
+  #kg .knode { cursor: pointer; }
+  #kg .knode circle { fill: var(--bg); stroke-width: 2.2; transition: r .15s; }
+  #kg .knode:hover circle { r: 26; }
+  #kg .knode.sel circle { stroke-width: 3.5; }
+  #kg text { font: 700 11px var(--mono); fill: var(--ink); text-anchor: middle; }
+  #kg .ksub { font-weight: 400; fill: var(--muted); font-size: 10px; }
+  #kg .kbig { font: 800 13px var(--mono); }
+  #insight-bar { margin-top: 10px; padding: 13px 15px; border-radius: 12px; min-height: 58px;
+                 background: var(--bg); border: 1px solid var(--line); border-left: 4px solid var(--accent);
+                 font-size: 14.5px; line-height: 1.5; }
+  #insight-bar .who { font: 700 10.5px/1 var(--mono); letter-spacing: 1.1px; color: var(--accent);
+                      display: block; margin-bottom: 4px; }
+  .tl { border-left: 3px solid var(--line); margin: 6px 0 6px 8px; padding-left: 16px; }
+  .tlrow { margin: 10px 0; font-size: 13.5px; position: relative; }
+  .tlrow::before { content: ""; position: absolute; left: -22px; top: 4px; width: 9px; height: 9px;
+                   border-radius: 50%; background: var(--line); }
+  .tlrow.v-VERIFIED::before { background: var(--green); }
+  .tlrow.v-BLOCKED::before { background: var(--red); }
+  .tlrow.v-PHARMACIST_REVIEW::before { background: var(--amber); }
+  .tlrow .when { font: 11px var(--mono); color: var(--muted); }
+  .orow { display: flex; align-items: center; gap: 10px; padding: 9px 12px; margin: 6px 0;
+          border: 1px solid var(--line); border-radius: 10px; font-size: 14px; }
+  .orow.hot { border-color: var(--amber); background: var(--amber-bg); }
+  .orow b { flex: 1; }
+  #pm-body h5 { font: 700 11px/1 var(--mono); letter-spacing: 1.3px; color: var(--muted); margin: 16px 0 8px; }
+
+  #restore { position: fixed; top: 64px; left: 50%; transform: translateX(-50%) translateY(-260%);
+             z-index: 60; background: var(--card); border: 2px solid var(--green); color: var(--green);
+             font: 700 14px var(--mono); border-radius: 14px; padding: 13px 22px;
+             box-shadow: 0 10px 34px rgba(46,125,79,.25); transition: transform .45s cubic-bezier(.3,1.2,.3,1); }
+  #restore.show { transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+  <div id="top">
+    <div id="wordmark">MEDPASS<span class="dot">.</span></div>
+    <div id="tagline">always-on medication safety &middot; models perceive &middot; rules decide &middot; humans approve</div>
+    <div class="stat"><b id="m-admin">–</b><span>events in memory</span></div>
+    <div class="stat"><b id="m-nm">–</b><span>near-misses</span></div>
+    <div class="stat"><b id="m-ledger">–</b><span>ledger rows</span></div>
+  </div>
+
+  <div id="main">
+    <!-- left: patient -->
+    <div class="col">
+      <div class="pane" id="pt-pane">
+        <h3>Patient record
+          <span style="float:right" class="chip ok" id="all-patients-btn"
+                onclick="openPatients()" role="button">ALL PATIENTS ▸</span></h3>
+        <div id="pt-name">—</div>
+        <div id="pt-meta">scan a wristband to load the record</div>
+        <div id="pt-orders"></div>
+      </div>
+      <div class="pane">
+        <h3>Med cabinet</h3>
+        <div id="cabinet">
+          <span class="big" id="cab-status">LOCKED</span>
+          <span class="chip grey" id="cab-chip">IDLE</span>
+        </div>
+        <div id="cab-note">hold is autonomous &middot; unlock requires a named pharmacist (app-layer policy gate)</div>
+      </div>
+      <div class="pane" style="flex:1; overflow:auto">
+        <h3>Last spoken</h3>
+        <div id="spoken-log" style="font-size:17px; font-weight:750; color:var(--ink); line-height:1.45">—</div>
+      </div>
+    </div>
+
+    <!-- middle: verdict + camera -->
+    <div class="col">
+      <div class="pane v-idle" id="verdict-pane">
+        <span id="source-chip"></span>
+        <div id="verdict" style="color:var(--muted); font-size:64px">READY</div>
+        <div id="verdict-chip"></div>
+        <div id="summary" style="color:var(--muted)">place the cup and wristband on the mat, then press SPACE</div>
+        <div id="transcript"></div>
+      </div>
+      <div class="pane" id="cam-pane">
+        <img id="cam" alt="live camera">
+        <canvas id="boxes"></canvas>
+        <div id="scanline"></div>
+        <span class="chip ok" id="cam-tag">LIVE CAMERA</span>
+        <div id="keys">SPACE verify &middot; A approve &middot; M memory on/off &middot; ESC unfocus &middot; 1/2/3 replay</div>
+      </div>
+    </div>
+
+    <!-- right: memory -->
+    <div class="col">
+      <div class="pane" id="memory-pane">
+        <h3>MongoDB memory — retrieval that changes behavior
+          <span id="mem-state" class="chip ok" onclick="toggleMemory()">MEMORY ON</span></h3>
+
+        <!-- live flow: documents stream out of MongoDB, through memory, to the agent -->
+        <div id="flow">
+          <div id="fwire"></div>
+          <div class="fstop" id="f-db">
+            <div class="glyph"><canvas id="px-db" width="10" height="10"></canvas></div>
+            <div class="fl">MONGODB</div><div class="fv" id="f-db-v">…</div>
+          </div>
+          <div class="fstop" id="f-mem">
+            <div class="glyph"><canvas id="px-mem" width="10" height="10"></canvas></div>
+            <div class="fl">MEMORY</div><div class="fv" id="f-mem-v">idle</div>
+          </div>
+          <div class="fstop" id="f-agent">
+            <div class="glyph"><canvas id="px-bot" width="10" height="10"></canvas></div>
+            <div class="fl">OPENCLAW</div><div class="fv" id="f-agent-v">watching</div>
+            <div class="ftip"><span class="tt">AGENT ACTIVITY</span><div id="f-agent-log">no activity yet</div></div>
+          </div>
+        </div>
+        <div id="retrieve-tick"></div>
+        <div id="agent-note"><span class="who">AGENT NOTE FOR CARE TEAM</span><span id="agent-note-text"></span></div>
+
+        <div id="mem-verdict-line" style="color:var(--muted)">no retrieval yet</div>
+        <div id="mem-evidence"></div>
+        <pre class="pipeline" id="mem-pipeline" style="display:none"></pre>
+        <div class="xstats" id="mem-stats" style="display:none"></div>
+      </div>
+      <div class="pane">
+        <h3>Ask the memory <span style="float:right;color:var(--muted);font-size:10px">nemotron-3-nano writes the query</span></h3>
+        <div id="ask-row">
+          <input id="ask" placeholder="How many near-misses this month, by shift?">
+          <button id="ask-go" onclick="askMemory()">Ask</button>
+        </div>
+        <div id="ask-out"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="audit">
+    <span class="title">Audit ledger (hash-chained)</span>
+    <div id="ledger-rows"></div>
+  </div>
+
+  <div id="restore">STATE RESTORED FROM MONGODB</div>
+
+  <div id="pmodal">
+    <div id="pcard">
+      <div id="pm-head">
+        <span id="pm-back" onclick="openPatients()" style="display:none">‹ all patients</span>
+        <h2 id="pm-title">Patient memory</h2>
+        <span id="pm-sub">live from MongoDB — click a patient to explore their history</span>
+        <button id="pm-close" onclick="closePatients()">✕</button>
+      </div>
+      <div id="pm-body"></div>
+    </div>
+  </div>
+
+  <div id="approve-banner">
+    <h4>⚠ Pharmacist review required — <span id="approve-ev"></span></h4>
+    <div class="row">
+      <input id="approver" placeholder="Approver name, e.g. D. Okafor, PharmD">
+      <button id="approve-go" onclick="sendApproval()">Approve &amp; unlock</button>
+      <button id="decline-go" onclick="sendDecline()">Decline</button>
+    </div>
+  </div>
+
+  <audio id="player"></audio>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+let heldEvent = null;
+
+/* ---------- helpers ---------- */
+const fmtBytes = n => n > 1e6 ? (n/1e6).toFixed(1)+" MB" : n > 1e3 ? (n/1e3).toFixed(1)+" kB" : n+" B";
+const fmtN = n => (n ?? 0).toLocaleString();
+function esc(el, s) { el.textContent = s ?? ""; }   // untrusted strings via textContent only
+
+/* ---------- metrics rail ---------- */
+async function refreshMetrics() {
+  try {
+    const m = await (await fetch("/metrics")).json();
+    esc($("m-admin"), fmtN(m.doc_counts.administrations));
+    esc($("m-nm"), fmtN(m.doc_counts.near_misses));
+    esc($("m-ledger"), fmtN(m.doc_counts.ledger));
+    const fdb = $("f-db-v"); if (fdb) fdb.textContent = fmtN(m.doc_counts.near_misses) + " nm";
+    setCabinet(m.cabinet.status, m.cabinet.held_for);
+    setMemChip(m.memory_enabled);
+  } catch (e) {}
+}
+setInterval(refreshMetrics, 4000); refreshMetrics();
+
+function setCabinet(status, heldFor) {
+  esc($("cab-status"), status || "LOCKED");
+  const chip = $("cab-chip");
+  if (status === "UNLOCKED") { chip.className = "chip ok"; esc(chip, "APPROVED"); }
+  else if (heldFor) { chip.className = "chip bad"; esc(chip, "HELD · " + heldFor); }
+  else { chip.className = "chip grey"; esc(chip, "IDLE"); }
+}
+function setMemChip(on) {
+  memOn = on;
+  const el = $("mem-state");
+  el.className = "chip " + (on ? "ok" : "grey");
+  esc(el, on ? "MEMORY ON" : "MEMORY OFF");
+  const f = $("f-mem"); if (f) f.style.opacity = on ? "1" : ".4";
+}
+
+/* ---------- ledger rail ---------- */
+async function refreshLedger() {
+  const d = await (await fetch("/ledger/recent?n=10")).json();
+  const box = $("ledger-rows"); box.innerHTML = "";
+  d.rows.forEach(r => {   // newest first, so the row a beat just wrote is visible
+    const el = document.createElement("span");
+    el.className = "lrow";
+    const mark = document.createElement("span");
+    mark.className = r.allowed ? "ok" : "no";
+    mark.textContent = r.allowed ? "✓ " : "✗ ";
+    el.appendChild(mark);
+    el.appendChild(document.createTextNode(`#${r.seq} ${r.actor} ${r.action}`));
+    box.appendChild(el);
+  });
+}
+refreshLedger();
+
+/* ---------- verdict card ---------- */
+const VSTYLE = {
+  VERIFIED: ["v-green", "VERIFIED", "ok"],
+  BLOCKED: ["v-red", "BLOCKED", "bad"],
+  PHARMACIST_REVIEW: ["v-amber", "REVIEW", "warn"],
+  HOLD_UNREADABLE: ["v-grey", "HOLD", "grey"],
+};
+function showVerdict(rec) {
+  const [cls, label, chipCls] = VSTYLE[rec.verdict] || ["v-idle", rec.verdict, "grey"];
+  const pane = $("verdict-pane");
+  pane.className = "pane " + cls;
+  $("verdict").style.cssText = "";
+  esc($("verdict"), label);
+  const chip = $("verdict-chip");
+  chip.innerHTML = "";
+  const c = document.createElement("span");
+  c.className = "chip " + chipCls;
+  c.textContent = rec.verdict.replaceAll("_", " ");
+  chip.appendChild(c);
+  esc($("summary"), rec.summary);
+  $("summary").style.color = "inherit";
+
+  const src = $("source-chip");
+  src.className = "chip " + (rec.source === "replay" ? "warn" : "ok");
+  esc(src, rec.source === "replay" ? "REPLAY FIXTURE" : "LIVE");
+
+  const t = $("transcript");
+  if (rec.spoken) { t.style.display = "inline-block"; esc(t, rec.spoken);
+    const log = $("spoken-log"); log.textContent = "“" + rec.spoken + "”";
+    if (rec.audio) { $("player").src = rec.audio; $("player").play().catch(()=>{}); }
+  } else t.style.display = "none";
+
+  if (rec.verdict === "BLOCKED") { pane.classList.add("flash"); setTimeout(() => pane.classList.remove("flash"), 1600); }
+  if (rec.verdict === "BLOCKED" || rec.verdict === "PHARMACIST_REVIEW") {
+    heldEvent = rec.event_id;
+    esc($("approve-ev"), rec.event_id);
+    $("approve-banner").style.display = "block";
+  } else {
+    // a clean verdict clears any stale review banner from the previous beat
+    heldEvent = null;
+    $("approve-banner").style.display = "none";
+  }
+  showPatient(rec);
+  showMemory(rec.memory);
+  refreshLedger(); refreshMetrics();
+}
+
+async function showPatient(rec) {
+  const mrn = rec.patient && rec.patient.mrn;
+  if (!mrn) return;
+  try {
+    const d = await (await fetch(`/patients/${mrn}/orders`)).json();
+    esc($("pt-name"), d.patient.name);
+    esc($("pt-meta"), `${d.patient.mrn} · DOB ${d.patient.dob} · room ${d.patient.room} · ward ${d.patient.ward}`);
+    const box = $("pt-orders"); box.innerHTML = "";
+    d.orders.filter(o => o.status === "active").forEach(o => {
+      const row = document.createElement("div"); row.className = "order";
+      const b = document.createElement("b"); b.textContent = o.drug ? `${o.drug} ${o.dose || ""}`.trim() : o.pill_id;
+      const s = document.createElement("span"); s.textContent = `due start+${o.demo_offset_min}m · ±${o.window_min}m`;
+      row.append(b, s); box.appendChild(row);
+    });
+  } catch (e) {}
+}
+
+/* ---------- memory panel ---------- */
+function showMemory(mem) {
+  const line = $("mem-verdict-line"), evBox = $("mem-evidence");
+  evBox.innerHTML = "";
+  $("mem-pipeline").style.display = "none"; $("mem-stats").style.display = "none";
+  if (!mem) { esc(line, "no retrieval on this verdict"); line.style.color = "var(--muted)"; return; }
+  if (!mem.memory_enabled) {
+    esc(line, "MEMORY OFF — retrieval skipped (counterfactual mode)"); line.style.color = "var(--grey)"; return;
+  }
+  if (mem.escalated) { esc(line, "⬆ " + mem.reason); line.style.color = "var(--amber)"; }
+  else if (mem.patterns && mem.patterns.length) { esc(line, "history consulted — no live risk pattern"); line.style.color = "var(--green)"; }
+  else { esc(line, "no retrieval on this verdict (rules already decided)"); line.style.color = "var(--muted)"; return; }
+  if (mem.patterns && mem.patterns.length) retrieveBurst(mem.patterns[0]);
+
+  (mem.patterns || []).forEach(p => {
+    const d = document.createElement("div");
+    d.className = "evidence" + (p.hot ? " hot" : "");
+    const head = document.createElement("div"); head.className = "head";
+    const t1 = document.createElement("span"); t1.textContent = `${p.drug} · ward ${p.ward}`;
+    const t2 = document.createElement("span"); t2.textContent = p.hot ? `${p.count} ≥ ${p.threshold} HOT` : `${p.count} < ${p.threshold}`;
+    head.append(t1, t2);
+    const nums = document.createElement("div"); nums.className = "nums";
+    const shifts = Object.entries(p.by_shift || {}).map(([k, v]) => `${k} ${v}`).join(" · ");
+    nums.textContent = `last ${p.window_days} days · ${shifts || "no events"}`;
+    d.append(head, nums);
+    (p.recent || []).forEach(r => {
+      const n = document.createElement("div"); n.className = "nm";
+      const b = document.createElement("b"); b.textContent = r.nm_id + " ";
+      const tag = document.createElement("span");
+      tag.className = "prov " + (r.provenance === "observed_today" ? "live" : "seed");
+      tag.textContent = r.provenance === "observed_today" ? "OBSERVED TODAY" : "SEEDED";
+      n.append(b, document.createTextNode((r.note || "") + " "), tag);
+      d.appendChild(n);
+    });
+    evBox.appendChild(d);
+    if (p.pipeline) {
+      // The raw pipeline is for technical reviewers, not nurse-facing: hidden behind a link.
+      const pre = $("mem-pipeline");
+      pre.style.display = "none";
+      pre.textContent = JSON.stringify(p.pipeline, null, 1);
+      let toggle = $("mem-pipeline-toggle");
+      if (!toggle) {
+        toggle = document.createElement("div");
+        toggle.id = "mem-pipeline-toggle";
+        toggle.style.cssText = "font:12px var(--mono);color:var(--accent);cursor:pointer;text-decoration:underline;margin-top:6px";
+        toggle.textContent = "show the MongoDB query";
+        pre.parentNode.insertBefore(toggle, pre);
+        toggle.addEventListener("click", () => {
+          const off = pre.style.display === "none";
+          pre.style.display = off ? "block" : "none";
+          toggle.textContent = off ? "hide the MongoDB query" : "show the MongoDB query";
+        });
+      }
+      const xs = $("mem-stats"); xs.style.display = "flex"; xs.innerHTML = "";
+      [["index", p.explain && p.explain.index], ["docs examined", p.explain && p.explain.docs_examined],
+       ["query", p.query_ms + " ms"]].forEach(([k, v]) => {
+        const s = document.createElement("span");
+        const b = document.createElement("b"); b.textContent = (v ?? "–") + " ";
+        s.append(b, document.createTextNode(k)); xs.appendChild(s);
+      });
+    }
+  });
+}
+
+async function toggleMemory() {
+  const r = await (await fetch("/demo/memory_toggle", { method: "POST" })).json();
+  setMemChip(r.memory_enabled);
+}
+
+/* ---------- the MongoDB flow strip ---------- */
+let memOn = true;
+function fdot(cls, dur) {
+  const w = $("fwire"); if (!w) return;
+  const d = document.createElement("span");
+  d.className = "fdot run " + (cls || "");
+  d.style.setProperty("--dur", dur + "s");
+  w.appendChild(d);
+  setTimeout(() => d.remove(), dur * 1000 + 80);
+}
+setInterval(() => { if (memOn) fdot("", 2.6); }, 820);   // ambient: events feeding memory
+
+function hotStop(id, ms = 1500) {
+  const s = $(id); if (!s) return;
+  s.classList.add("hot"); setTimeout(() => s.classList.remove("hot"), ms);
+}
+function retrieveBurst(p) {
+  // a visible burst of documents leaving MongoDB at retrieval time
+  for (let i = 0; i < 8; i++) setTimeout(() => fdot("burst", 0.75), i * 90);
+  hotStop("f-db", 1600); setTimeout(() => hotStop("f-mem", 1400), 350);
+  const t = $("retrieve-tick");
+  const docs = (p.explain && p.explain.docs_examined) ?? "?";
+  let shown = 0; const target = typeof docs === "number" ? docs : 0;
+  t.classList.add("show");
+  const iv = setInterval(() => {
+    shown = Math.min(target, shown + 1);
+    t.textContent = `⚡ ${p.explain && p.explain.index ? p.explain.index : "collscan"} · ${shown || docs} docs examined · ${p.query_ms} ms`;
+    if (shown >= target) clearInterval(iv);
+  }, 45);
+  setTimeout(() => t.classList.remove("show"), 9000);
+  $("f-mem-v").textContent = p.hot ? `${p.count}/${p.threshold} HOT` : `${p.count} < ${p.threshold}`;
+  $("f-mem-v").style.color = p.hot ? "var(--amber)" : "var(--green)";
+}
+/* ---------- patient memory explorer ---------- */
+let kgMrn = null;
+function refreshKG() {  // live update: new verdicts/decisions become nodes immediately
+  if ($("pmodal").classList.contains("open") && kgMrn) setTimeout(() => showPatientHistory(kgMrn), 400);
+}
+function closePatients() { $("pmodal").classList.remove("open"); kgMrn = null; }
+async function openPatients() {
+  $("pmodal").classList.add("open");
+  kgMrn = null;
+  $("pm-back").style.display = "none";
+  esc($("pm-title"), "Patient memory");
+  esc($("pm-sub"), "live from MongoDB — click a patient to explore their history");
+  const B = $("pm-body"); B.innerHTML = "";
+  try {
+    const d = await (await fetch("/patients_seen")).json();
+    if (!d.patients.length) { B.appendChild(elx("div", null, "No patients verified yet — run a scan first.")); return; }
+    d.patients.forEach(p => {
+      const row = elx("div", "prow");
+      row.appendChild(elx("span", "pname", (p.name || p.mrn || "?").toString()));
+      const chips = document.createElement("span");
+      const mk = (n, cls, label) => { if (n > 0) { const c = elx("span", "chip " + cls, `${n} ${label}`); c.style.marginLeft = "6px"; chips.appendChild(c); } };
+      mk(p.checks, "grey", "checks"); mk(p.blocked, "bad", "blocked"); mk(p.review, "warn", "review");
+      row.appendChild(chips);
+      row.appendChild(elx("span", "pmeta", `ward ${p.ward || "?"}`));
+      row.addEventListener("click", () => showPatientHistory(p.mrn));
+      B.appendChild(row);
+    });
+  } catch (e) { B.textContent = "memory unavailable"; }
+}
+const KG_COLORS = { patient: "#c9673f", medOk: "#2e7d4f", medHot: "#a86412",
+                    VERIFIED: "#2e7d4f", BLOCKED: "#b3261e", PHARMACIST_REVIEW: "#a86412",
+                    HOLD_UNREADABLE: "#6b6f76", ward: "#6b6f76" };
+
+async function showPatientHistory(mrn) {
+  kgMrn = mrn;
+  const B = $("pm-body"); B.innerHTML = "";
+  $("pm-back").style.display = "block";
+  try {
+    const d = await (await fetch(`/patients/${mrn}/history`)).json();
+    esc($("pm-title"), (d.patient.name || mrn).toString());
+    esc($("pm-sub"), `${d.patient.mrn} · DOB ${d.patient.dob} · room ${d.patient.room} · ward ${d.patient.ward} — click any node`);
+
+    // ---- build the knowledge graph: patient center, meds left, events right, ward below
+    const first = (d.patient.name || mrn).split(" ")[0];
+    const nodes = [{ id: "p", x: 310, y: 165, r: 26, color: KG_COLORS.patient, label: first,
+                     sub: `${(d.timeline || []).length} checks`, insight: (d.insights || [])[0] ||
+                       "No history yet - run a verification with this patient's wristband." }];
+    (d.orders || []).slice(0, 3).forEach((o, i) => nodes.push({
+      id: "m" + i, x: 95, y: 75 + i * 95, r: 20,
+      color: o.hot ? KG_COLORS.medHot : KG_COLORS.medOk,
+      label: o.drug, sub: o.hot ? "⚠ watch-list" : "routine",
+      insight: o.hot
+        ? `${o.drug} is this ward's biggest risk (${o.near_misses_90d} near-misses/90d, mostly ${o.top_shift} shift). MEDPASS auto-escalates every ${o.drug} pass to a pharmacist.`
+        : `${o.drug} ${o.dose}: ${o.near_misses_90d} near-misses on this ward in 90 days - routine handling.`,
+    }));
+    const extraEdges = [];
+    (d.timeline || []).slice(0, 5).forEach((v, i) => {
+      const t = new Date(v.ts);
+      const when = isNaN(t) ? "" : t.toLocaleTimeString([], { hour12: false });
+      const dec = v.decision ? ((v.decision.action === "pharmacist_approval" ? " ✓ Approved by " : " ✗ Declined by ") + v.decision.actor + ".") : "";
+      const ey = 42 + i * 64;
+      nodes.push({ id: "e" + i, x: 505, y: ey, r: 15,
+        color: KG_COLORS[v.verdict] || KG_COLORS.ward,
+        label: v.verdict.split("_")[0], sub: when,
+        insight: `${when} - ${v.verdict.replaceAll("_", " ")}: ${v.summary || ""}${dec}` });
+      if (v.decision) {
+        // the human decision hangs off its event as its own node
+        const ok = v.decision.action === "pharmacist_approval";
+        nodes.push({ id: "d" + i, x: 585, y: ey + 22, r: 10,
+          color: ok ? KG_COLORS.VERIFIED : KG_COLORS.BLOCKED,
+          label: ok ? "✓ appr" : "✗ decl", sub: "",
+          insight: (ok ? "Approved by " : "Declined by ") + v.decision.actor +
+                   (ok ? " - cabinet unlocked, administration cleared and charted."
+                       : " - the block stood; recorded as a caught near-miss the memory now counts.") });
+        extraEdges.push(["e" + i, "d" + i]);
+      }
+    });
+    nodes.push({ id: "w", x: 310, y: 300, r: 17, color: KG_COLORS.ward, label: "ward " + (d.patient.ward || "?"),
+                 sub: "context",
+                 insight: (d.insights || []).find(s => s.startsWith("Look-alike")) ||
+                          `Ward ${d.patient.ward}: the memory layer aggregates every near-miss here into live risk patterns.` });
+
+    const NS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(NS, "svg");
+    svg.setAttribute("id", "kg"); svg.setAttribute("viewBox", "0 0 620 345");
+    const center = nodes[0];
+    const byId = Object.fromEntries(nodes.map(n => [n.id, n]));
+    const drawEdge = (a, b) => {
+      const e = document.createElementNS(NS, "path");
+      const mx = (a.x + b.x) / 2;
+      e.setAttribute("d", `M ${a.x} ${a.y} C ${mx} ${a.y}, ${mx} ${b.y}, ${b.x} ${b.y}`);
+      e.setAttribute("class", "kedge"); svg.appendChild(e);
+    };
+    nodes.slice(1).filter(n => !n.id.startsWith("d")).forEach(n => drawEdge(center, n));
+    extraEdges.forEach(([a, b]) => drawEdge(byId[a], byId[b]));
+    if ((d.timeline || []).length > 5) {
+      // the older history is still in MongoDB - say so instead of hiding it
+      const more = document.createElementNS(NS, "text");
+      more.setAttribute("x", 505); more.setAttribute("y", 340);
+      more.setAttribute("class", "ksub");
+      more.textContent = `+${(d.timeline || []).length - 5} older checks in memory`;
+      svg.appendChild(more);
+    }
+    nodes.forEach(n => {
+      const g = document.createElementNS(NS, "g");
+      g.setAttribute("class", "knode"); g.dataset.id = n.id;
+      const c = document.createElementNS(NS, "circle");
+      c.setAttribute("cx", n.x); c.setAttribute("cy", n.y); c.setAttribute("r", n.r);
+      c.setAttribute("stroke", n.color);
+      const t1 = document.createElementNS(NS, "text");
+      t1.setAttribute("x", n.x); t1.setAttribute("y", n.y + n.r + 15);
+      t1.textContent = n.label; if (n.id === "p") t1.setAttribute("class", "kbig");
+      const t2 = document.createElementNS(NS, "text");
+      t2.setAttribute("x", n.x); t2.setAttribute("y", n.y + n.r + 28); t2.setAttribute("class", "ksub");
+      t2.textContent = n.sub || "";
+      const dot = document.createElementNS(NS, "circle");
+      dot.setAttribute("cx", n.x); dot.setAttribute("cy", n.y); dot.setAttribute("r", Math.max(4, n.r - 12));
+      dot.setAttribute("fill", n.color); dot.setAttribute("stroke", "none"); dot.setAttribute("opacity", ".85");
+      g.append(c, dot, t1, t2);
+      g.addEventListener("click", () => selectKG(n, svg));
+      svg.appendChild(g);
+    });
+    B.appendChild(svg);
+    const bar = elx("div"); bar.id = "insight-bar";
+    bar.appendChild(elx("span", "who", "AI INSIGHT — FROM THE MEMORY LAYER"));
+    const txt = elx("span"); txt.id = "insight-text"; bar.appendChild(txt);
+    B.appendChild(bar);
+    selectKG(nodes[0], svg);
+  } catch (e) { B.textContent = "history unavailable"; }
+}
+function selectKG(n, svg) {
+  svg.querySelectorAll(".knode").forEach(g => g.classList.toggle("sel", g.dataset.id === n.id));
+  const t = $("insight-text"); if (!t) return;
+  t.textContent = "";
+  const s = n.insight || ""; let i = 0;
+  const iv = setInterval(() => { t.textContent = s.slice(0, ++i); if (i >= s.length) clearInterval(iv); }, 8);
+}
+function elx(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+$("pmodal").addEventListener("click", e => { if (e.target.id === "pmodal") closePatients(); });
+
+/* ---------- 8-bit sprites for the agent strip ---------- */
+const PAL = { "#": "#2a2721", g: "#4c9a63", G: "#2e7d4f", p: "#d98cb3", P: "#b3688f",
+              w: "#faf7f0", r: "#c9673f", y: "#e8b04b", ".": null };
+function pixelSprite(id, rows) {
+  const cv = $(id); if (!cv) return;
+  const ctx = cv.getContext("2d");
+  rows.forEach((row, y) => [...row].forEach((ch, x) => {
+    if (PAL[ch]) { ctx.fillStyle = PAL[ch]; ctx.fillRect(x, y, 1, 1); }
+  }));
+}
+pixelSprite("px-db", [   // the MongoDB stack
+  ".########.", "#gggggggg#", "#gGgggggg#", ".########.",
+  "#gggggggg#", "#gGgggggg#", ".########.",
+  "#gggggggg#", "#gGgggggg#", ".########.",
+]);
+pixelSprite("px-mem", [  // the memory brain
+  "..######..", ".#pppppp#.", "#pPpppPpp#", "#pppppppp#",
+  "#pPpppppp#", "#ppppPppp#", "#pppppppp#", ".#pppppp#.",
+  "..##..##..", "..........",
+]);
+pixelSprite("px-bot", [  // the OpenClaw agent
+  "....##....", "...#yy#...", ".########.", "#wwwwwwww#",
+  "#w#www#ww#", "#wwwwwwww#", ".########.", ".#r#..#r#.",
+  ".##....##.", "..........",
+]);
+
+/* the agent's visible activity log (hover the OpenClaw glyph) */
+const agentLog = [];
+function logAgent(text) {
+  agentLog.unshift(`${new Date().toLocaleTimeString([], {hour12: false})} · ${text}`);
+  if (agentLog.length > 6) agentLog.pop();
+  const box = $("f-agent-log");
+  if (box) { box.innerHTML = ""; agentLog.forEach(t => { const d = document.createElement("div"); d.textContent = t; box.appendChild(d); }); }
+}
+
+/* the carrier: the agent visibly walks the pharmacist's decision back to MongoDB */
+function agentCarry(decision) {
+  logAgent(`carrying ${decision} decision to MongoDB`);
+  hotStop("f-agent", 900);
+  for (let i = 0; i < 3; i++) setTimeout(() => fdot("rev carrier", 1.15), i * 260);
+  setTimeout(() => { hotStop("f-db", 1300); logAgent("decision written · context retrieved"); }, 1100);
+}
+function showAgentNote(d) {
+  logAgent(`note for care team (${d.decision})`);
+  const box = $("agent-note"), txt = $("agent-note-text");
+  box.style.display = "block"; txt.textContent = "";
+  const s = d.note || "";
+  let i = 0;                       // typewriter reveal, ~18ms/char
+  const iv = setInterval(() => { txt.textContent = s.slice(0, ++i); if (i >= s.length) clearInterval(iv); }, 16);
+}
+
+function agentFlow(stage) {
+  const w = $("fwire");
+  if (stage === "change_stream_wake") {
+    w.classList.remove("pulse"); void w.offsetWidth; w.classList.add("pulse");
+    for (let i = 0; i < 4; i++) setTimeout(() => fdot("burst", 0.55), i * 110);
+    hotStop("f-agent", 2000);
+    $("f-agent-v").textContent = "WOKEN"; $("f-agent-v").style.color = "var(--accent)";
+    logAgent("woken by MongoDB change stream");
+  } else if (stage === "cabinet_hold") {
+    $("f-agent-v").textContent = "held cabinet"; $("f-agent-v").style.color = "var(--red)";
+    logAgent("requested cabinet hold via HTTP");
+  } else if (stage === "openclaw_wake") {
+    $("f-agent-v").textContent = "paged on-call"; $("f-agent-v").style.color = "var(--ink)";
+    logAgent("paged the on-call channel");
+  }
+  setTimeout(() => { $("f-agent-v").textContent = "watching"; $("f-agent-v").style.color = ""; }, 6000);
+}
+
+/* ---------- ask the memory ---------- */
+async function askMemory() {
+  const q = $("ask").value.trim() || $("ask").placeholder;
+  const out = $("ask-out");
+  out.innerHTML = ""; const w = document.createElement("div"); w.textContent = "thinking (local model writing the query)…";
+  w.style.color = "var(--muted)"; out.appendChild(w);
+  try {
+    const r = await (await fetch(`/memory/ask?q=${encodeURIComponent(q)}`)).json();
+    out.innerHTML = "";
+    const a = document.createElement("div"); a.id = "ask-answer";
+    const total = r.rows.reduce((s, x) => s + (x.n || x.count || 0), 0);
+    a.textContent = r.rows.length ? `${total || r.rows.length} result${r.rows.length > 1 ? "s" : ""} · ${r.model} · ${r.total_ms} ms` : "no rows";
+    out.appendChild(a);
+    r.rows.slice(0, 6).forEach(row => {
+      const d = document.createElement("div");
+      d.style.cssText = "font-family:var(--mono);font-size:12px;padding:2px 0";
+      d.textContent = JSON.stringify(row);
+      out.appendChild(d);
+    });
+    const pre = document.createElement("pre"); pre.className = "pipeline";
+    pre.textContent = JSON.stringify(r.pipeline, null, 1);
+    out.appendChild(pre);
+  } catch (e) { out.textContent = "query failed"; }
+}
+$("ask").addEventListener("keydown", e => { if (e.key === "Enter") { askMemory(); $("ask").blur(); } });
+
+/* ---------- approval ---------- */
+async function sendDecline() {
+  const name = $("approver").value.trim();
+  if (!name || !heldEvent) { $("approver").focus(); return; }
+  await fetch("/approvals/decline", { method: "POST", headers: { "content-type": "application/json" },
+                                      body: JSON.stringify({ event_id: heldEvent, approver: name }) });
+  $("approve-banner").style.display = "none";
+  $("approver").value = ""; $("approver").blur(); heldEvent = null;
+  refreshLedger(); refreshMetrics();
+}
+async function sendApproval() {
+  const name = $("approver").value.trim();
+  if (!name || !heldEvent) return;
+  await fetch("/approvals", { method: "POST", headers: { "content-type": "application/json" },
+                              body: JSON.stringify({ event_id: heldEvent, approver: name }) });
+  $("approve-banner").style.display = "none";
+  $("approver").value = "";
+  $("approver").blur(); heldEvent = null;
+  refreshLedger(); refreshMetrics();
+}
+
+/* ---------- camera boxes ---------- */
+let frameTimer = null;
+function clearBoxes() {
+  const cv = $("boxes");
+  cv.getContext("2d").clearRect(0, 0, cv.width, cv.height);
+}
+function drawBoxes(boxes, still) {
+  const cv = $("boxes"), img = $("cam");
+  // Freeze on the exact frame the boxes were computed from, then return to live -
+  // boxes over a moving feed drift off their objects and linger confusingly.
+  if (still) {
+    img.src = still;
+    clearTimeout(frameTimer);
+    frameTimer = setTimeout(() => { clearBoxes(); img.src = "/camera/stream?r=" + Date.now(); }, 6000);
+  }
+  cv.width = cv.clientWidth; cv.height = cv.clientHeight;
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  // account for object-fit: contain letterboxing
+  const ar = 960 / 540, box = cv.width / cv.height;
+  let w = cv.width, h = cv.height, ox = 0, oy = 0;
+  if (box > ar) { w = h * ar; ox = (cv.width - w) / 2; } else { h = w / ar; oy = (cv.height - h) / 2; }
+  ctx.lineWidth = 2.5; ctx.font = "700 13px system-ui";
+  (boxes || []).forEach(b => {
+    const color = b.kind === "wristband" ? "#7ec8ff" : "#ffd166";
+    ctx.strokeStyle = color; ctx.fillStyle = color;
+    ctx.strokeRect(ox + b.x * w, oy + b.y * h, b.w * w, b.h * h);
+    ctx.fillText(b.label, ox + b.x * w + 3, oy + b.y * h - 5);
+  });
+}
+
+/* ---------- SSE ---------- */
+let wasConnected = false;
+function connectSSE() {
+  const es = new EventSource("/events");
+  es.onopen = async () => {
+    if (wasConnected) {   // process died and came back: prove the survival story
+      $("cam").src = "/camera/stream?r=" + Date.now();
+      try {
+        const m = await (await fetch("/metrics")).json();
+        if (m.uptime_s < 25) {
+          const r = $("restore");
+          r.textContent = `STATE RESTORED FROM MONGODB — ${fmtN(m.doc_counts.ledger)} ledger rows · chain ${m.chain.ok ? "OK" : "BROKEN"} · 0 lost`;
+          r.classList.add("show");
+          setTimeout(() => r.classList.remove("show"), 7000);
+        }
+      } catch (e) {}
+    }
+    wasConnected = true;
+  };
+  es.addEventListener("agent", e => agentFlow(JSON.parse(e.data).stage));
+  es.addEventListener("declined", e => {
+    const d = JSON.parse(e.data);
+    const pane = $("verdict-pane");
+    pane.className = "pane v-red";
+    esc($("verdict"), "DECLINED");
+    $("verdict").style.cssText = "";
+    const chip = $("verdict-chip"); chip.innerHTML = "";
+    const c = document.createElement("span"); c.className = "chip bad";
+    c.textContent = "DECLINED BY " + (d.approver || "").toUpperCase(); chip.appendChild(c);
+    esc($("summary"), `Block stands - cabinet stays locked (ledger #${d.ledger_seq}).`);
+    $("transcript").style.display = "none";
+    agentCarry("declined");
+    refreshLedger(); refreshMetrics(); refreshKG();
+  });
+  es.addEventListener("agent_note", e => showAgentNote(JSON.parse(e.data)));
+  es.addEventListener("verification", e => showVerdict(JSON.parse(e.data).record));
+  es.addEventListener("boxes", e => { const d = JSON.parse(e.data); drawBoxes(d.boxes, d.still); });
+  es.addEventListener("cabinet", e => { const d = JSON.parse(e.data); setCabinet(d.status, d.held_for); refreshLedger(); });
+  es.addEventListener("approval", e => {
+    const d = JSON.parse(e.data);
+    // The card must not stay on REVIEW after a human decided.
+    const pane = $("verdict-pane");
+    pane.className = "pane v-green";
+    esc($("verdict"), "APPROVED");
+    $("verdict").style.cssText = "";
+    const chip = $("verdict-chip"); chip.innerHTML = "";
+    const c = document.createElement("span"); c.className = "chip ok";
+    c.textContent = "APPROVED BY " + (d.approver || "").toUpperCase(); chip.appendChild(c);
+    esc($("summary"), `Cabinet unlocked - administration may proceed (ledger #${d.ledger_seq}).`);
+    $("transcript").style.display = "none";
+    agentCarry("approved");
+    refreshLedger(); refreshMetrics(); refreshKG();
+  });
+  es.addEventListener("denied", () => { refreshLedger(); });
+  es.addEventListener("memory_toggle", e => setMemChip(JSON.parse(e.data).enabled));
+  es.onerror = () => { es.close(); setTimeout(connectSSE, 1500); };
+}
+connectSSE();
+// MJPEG stream attached after load so it never blocks the page's load event.
+window.addEventListener("load", () => { $("cam").src = "/camera/stream"; });
+
+/* ---------- keys ---------- */
+function playScan() {
+  clearBoxes();
+  const p = $("cam-pane");
+  p.classList.remove("scanning"); void p.offsetWidth; p.classList.add("scanning");
+  setTimeout(() => p.classList.remove("scanning"), 2500);
+}
+let busy = false;
+async function fire(url) {
+  if (busy) return; busy = true;
+  $("verdict").style.color = "var(--muted)";
+  try { const r = await fetch(url, { method: "POST" }); if (!r.ok) console.warn(await r.text()); }
+  finally { busy = false; }
+}
+document.addEventListener("keydown", e => {
+  // ESC always returns focus to the stage so SPACE works again after typing
+  if (e.key === "Escape") {
+    if ($("pmodal").classList.contains("open")) { closePatients(); return; }
+    document.activeElement && document.activeElement.blur(); return;
+  }
+  if (e.target.tagName === "INPUT") return;
+  if (e.code === "Space") { e.preventDefault(); playScan(); fire("/demo/trigger"); }
+  else if (e.key === "1") { playScan(); fire("/demo/replay/green"); }
+  else if (e.key === "2") { playScan(); fire("/demo/replay/block"); }
+  else if (e.key === "3") { playScan(); fire("/demo/replay/memory"); }
+  else if (e.key.toLowerCase() === "m") toggleMemory();
+  else if (e.key.toLowerCase() === "a") { if (heldEvent) { $("approve-banner").style.display = "block"; $("approver").focus(); } }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,16 @@
+drug_id,brand_name,generic_name,form,strength,indication,allergy_flag,contraindications,notes,safe_for_maria,safe_for_martin
+MED001,Tylenol,Acetaminophen,Tablet,500mg,Pain relief / Fever,NONE,Liver disease; avoid with alcohol,Common OTC pain reliever,YES,YES
+MED002,Advil,Ibuprofen,Tablet,200mg,Pain relief / Inflammation / Fever,NONE,Renal impairment; GI bleed risk; caution with fall risk patients,NSAID - caution for fall risk (Maria),CAUTION,YES
+MED003,Amoxil,Amoxicillin,Capsule,500mg,Bacterial infection (ear/sinus/UTI),PENICILLIN,Do NOT administer to penicillin-allergic patients,⚠️ CONTRAINDICATED for Maria - penicillin allergy,NO - CONTRAINDICATED,YES
+MED004,Keflex,Cephalexin,Capsule,500mg,Bacterial infection (skin/respiratory),PENICILLIN (cross-allergy risk),Use with caution in penicillin-allergic patients (~1-3% cross-reactivity),Alternative antibiotic but has cross-allergy risk with penicillin,CAUTION,YES
+MED005,Zithromax,Azithromycin,Tablet,250mg,Bacterial infection (respiratory/skin),NONE,QT prolongation risk; drug interactions with antacids,Safe antibiotic alternative for penicillin-allergic patients,YES,YES
+MED006,Lasix,Furosemide,Tablet,40mg,Edema / Heart failure / Hypertension,NONE,Electrolyte imbalance; dehydration risk; increases fall risk,⚠️ Increases fall risk - monitor Maria closely,CAUTION (fall risk),YES
+MED007,Coumadin,Warfarin,Tablet,5mg,Blood clot prevention / AFib,NONE,Bleeding risk; many drug-drug interactions; fall risk patients,⚠️ Dangerous in fall risk patients - head bleed risk,CAUTION (fall risk),YES
+MED008,Metoprolol,Metoprolol Tartrate,Tablet,25mg,Hypertension / Heart failure / Angina,NONE,Bradycardia; avoid abrupt discontinuation; dizziness (fall risk),Dizziness side effect increases fall risk,CAUTION (fall risk),YES
+MED009,Augmentin,Amoxicillin-Clavulanate,Tablet,875mg,Bacterial infection (broad spectrum),PENICILLIN,Do NOT administer to penicillin-allergic patients,⚠️ CONTRAINDICATED for Maria - contains amoxicillin,NO - CONTRAINDICATED,YES
+MED010,Benadryl,Diphenhydramine,Tablet,25mg,Allergic reaction / Sleep aid,NONE,Sedation; confusion; strongly increases fall risk in elderly,⚠️ HIGH fall risk - avoid in elderly patients like Maria (age 78),NO - HIGH FALL RISK,CAUTION
+MED011,Clindamycin,Clindamycin,Capsule,300mg,Bacterial infection,NONE,C. diff risk; GI upset,Safe penicillin-alternative antibiotic for Maria,YES,YES
+MED012,Zofran,Ondansetron,Tablet (ODT),4mg,Nausea / Vomiting,NONE,QT prolongation; constipation,Anti-nausea medication; safe for both patients,YES,YES
+MED013,Prilosec,Omeprazole,Capsule,20mg,GERD / Acid reflux / Ulcer prevention,NONE,Low magnesium with long-term use; may mask symptoms,PPI - commonly prescribed with NSAIDs,YES,YES
+MED014,Ambien,Zolpidem,Tablet,5mg,Insomnia,NONE,Sedation; next-day drowsiness; HIGH fall risk in elderly,⚠️ CONTRAINDICATED in fall risk patients,NO - FALL RISK,CAUTION
+MED015,Lisinopril,Lisinopril,Tablet,10mg,Hypertension / Heart failure,NONE,Dizziness on standing (orthostatic hypotension); fall risk,ACE inhibitor - monitor blood pressure; fall risk concern,CAUTION (fall risk),YES

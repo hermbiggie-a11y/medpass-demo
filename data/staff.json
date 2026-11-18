@@ -1,0 +1,14 @@
+[
+  {
+    "role": "pharmacist_on_call",
+    "name": "D. Okafor",
+    "channel": "telegram",
+    "handle": "@medpass_pharm_demo"
+  },
+  {
+    "role": "charge_nurse",
+    "name": "S. Lin",
+    "channel": "tui",
+    "handle": "local"
+  }
+]
